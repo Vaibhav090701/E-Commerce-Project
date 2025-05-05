@@ -1,0 +1,15 @@
+services:
+  - name: ecommerce
+    type: web
+    runtime: docker
+    repo: https://github.com/Vaibhav090701/E-Commerce-Project.git
+    region: oregon
+    plan: free
+    dockerfilePath: ./Dockerfile
+    buildCommand: ""
+    startCommand: ""
+    autoDeploy: true
+    healthCheckPath: /
+    envVars:
+      - key: JAVA_OPTS
+        value: "-Xmx512m"
