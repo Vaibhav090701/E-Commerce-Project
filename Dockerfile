@@ -1,15 +1,20 @@
-# Use a lightweight JDK base image
-FROM openjdk:17-jdk-slim
-
-# Set a working directory in the container
+# Use Maven image to build the app
+FROM maven:3.9.4-eclipse-temurin-17 AS build
 WORKDIR /app
 
-# Copy the built JAR file into the container
-COPY target/ecommerce-0.0.1-SNAPSHOT.jar app.jar
+# Copy all files
+COPY . .
 
-# Expose port (adjust if your app uses a different port)
-EXPOSE 8080
+# Package the application
+RUN mvn clean package -DskipTests
 
-# Run the JAR file
+# Use a smaller base image for the final container
+FROM eclipse-temurin:17
+WORKDIR /app
+
+# Copy the jar from the previous stage
+COPY --from=build /app/target/*.jar app.jar
+
+# Run the jar file
 ENTRYPOINT ["java", "-jar", "app.jar"]
-	
+
