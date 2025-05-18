@@ -1,78 +1,59 @@
 package com.project.ecommerce.controller;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
+import java.io.*;
+import java.util.*;
 
 public class FileReadingAndWriting {
-	
-    private static final String INPUT_FILE = "src/input.txt";
-    private static final String OUTPUT_FILE = "src/output.txt";
-    private static final int QUEUE_CAPACITY = 100;
-    private static final String END_MARKER = "EOF"; // Special marker to stop the writer
+    static int turn = 0; // 0 = thread 1, 1 = thread 2, etc.
+    static final Object lock = new Object();
 
-    public static void main(String[] args) {
-        BlockingQueue<String> queue = new ArrayBlockingQueue(QUEUE_CAPACITY);
-
-        Thread readerThread = new Thread(new ReaderTask(queue, INPUT_FILE));
-        Thread writerThread = new Thread(new WriterTask(queue, OUTPUT_FILE));
-
-        readerThread.start();
-        writerThread.start();
-    }
-}
-
-// Reader Task: Reads lines from a file and puts them into the queue
-class ReaderTask implements Runnable {
-    private BlockingQueue<String> queue;
-    private String inputFile;
-
-    public ReaderTask(BlockingQueue<String> queue, String inputFile) {
-        this.queue = queue;
-        this.inputFile = inputFile;
-    }
-
-    @Override
-    public void run() {
-        try (BufferedReader br = new BufferedReader(new FileReader(inputFile))) {
+	public static void main(String[] args) throws FileNotFoundException, IOException {
+        // Read numbers from file
+        List<String> lines = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader("src/input.txt"))) {
             String line;
             while ((line = br.readLine()) != null) {
-                queue.put(line); // blocks if the queue is full
+                lines.add(line);
             }
-            queue.put("EOF"); // signal end of file
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
+        }
+
+        // Define thread ranges manually
+        List<List<String>> threadData = new ArrayList<>();
+        threadData.add(lines.subList(0, 4));   // Thread 0: lines 0-3
+        threadData.add(lines.subList(4, 8));   // Thread 1: lines 4-7
+        threadData.add(lines.subList(8, 12));  // Thread 2: lines 8-11
+        threadData.add(lines.subList(12, 15)); // Thread 3: lines 12-14
+
+        int threadCount = threadData.size();
+
+        for (int i = 0; i < threadCount; i++) {
+            final int threadId = i;
+            final List<String> data = threadData.get(i);
+
+            new Thread(() -> {
+                for (int i1 = 0; i1 < data.size(); i1++) {
+                    synchronized (lock) {
+                        while (turn != threadId) {
+                            try {
+                                lock.wait();
+                            } catch (InterruptedException e) {
+                                e.printStackTrace();
+                            }
+                        }
+
+                        // Print this cycle's item if available
+                        if (i1 < data.size()) {
+                            System.out.println("Thread " + (threadId + 1) + ": " + data.get(i1));
+                        }
+
+                        // Move to next thread
+                        turn = (turn + 1) % threadCount;
+                        lock.notifyAll();
+                    }
+                }
+            }).start();
         }
     }
-}
 
-// Writer Task: Takes lines from the queue and writes them to a file
-class WriterTask implements Runnable {
-    private BlockingQueue<String> queue;
-    private String outputFile;
+	}
 
-    public WriterTask(BlockingQueue<String> queue, String outputFile) {
-        this.queue = queue;
-        this.outputFile = outputFile;
-    }
-
-    @Override
-    public void run() {
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(outputFile))) {
-            while (true) {
-                String line = queue.take(); // blocks if queue is empty
-                if ("EOF".equals(line)) break;
-                bw.write(line);
-                bw.newLine();
-            }
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
-        }
-    }
-
-
-}
